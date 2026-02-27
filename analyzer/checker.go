@@ -9,46 +9,54 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-func run(pass *analysis.Pass) (any, error) {
+func RunWithConfig(cfg Config) func(*analysis.Pass) (any, error) {
+	return func(pass *analysis.Pass) (any, error) {
 
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(n ast.Node) bool {
-			call, ok := n.(*ast.CallExpr)
-			if !ok {
-				return true
-			}
+		c := Checker{cfg: &cfg}
+		for _, file := range pass.Files {
+			ast.Inspect(file, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
 
-			if len(call.Args) == 0 {
-				return true
-			}
+				if len(call.Args) == 0 {
+					return true
+				}
 
-			sel, ok := call.Fun.(*ast.SelectorExpr)
-			if !ok {
-				return true
-			}
+				sel, ok := call.Fun.(*ast.SelectorExpr)
+				if !ok {
+					return true
+				}
 
-			if isLoggerFunc(sel.Sel.Name) {
-				c := Checker{}
-				for _, arg := range call.Args {
+				if c.isLoggerFunc(sel.Sel.Name) {
+					for _, arg := range call.Args {
 
-					switch expr := arg.(type) {
-					case *ast.BasicLit:
-						c.checkCapital(pass, expr)
-						c.checkInvalid(pass, expr)
-					default:
-						c.basePos = arg.Pos()
-						c.checkExpression(pass, arg)
+						switch expr := arg.(type) {
+						case *ast.BasicLit:
+							if cfg.CheckCapital {
+								c.checkCapital(pass, expr)
+							}
+							if cfg.CheckInvalid {
+								c.checkInvalid(pass, expr)
+							}
+						default:
+							c.basePos = arg.Pos()
+							c.checkExpression(pass, arg)
+						}
 					}
 				}
-			}
-			return true
-		})
+				return true
+			})
+		}
+		return nil, nil
 	}
-	return nil, nil
+
 }
 
 type Checker struct {
 	basePos token.Pos
+	cfg     *Config
 }
 
 func (c *Checker) checkCapital(pass *analysis.Pass, expr *ast.BasicLit) {
@@ -57,8 +65,8 @@ func (c *Checker) checkCapital(pass *analysis.Pass, expr *ast.BasicLit) {
 	}
 
 	clearText := strings.Trim(expr.Value, "\"")
-	if len(clearText) > 0 && hasFirstCapital(clearText) {
-		newText := fixCapital(clearText)
+	if len(clearText) > 0 && c.hasFirstCapital(clearText) {
+		newText := c.fixCapital(clearText)
 		pass.Report(analysis.Diagnostic{
 			Pos:     expr.ValuePos + 1,
 			End:     expr.End(),
@@ -84,8 +92,8 @@ func (c *Checker) checkInvalid(pass *analysis.Pass, expr *ast.BasicLit) {
 		return
 	}
 
-	if ok, pos := hasInvalidSymbol(expr.Value); ok {
-		newText := fixInvalid(expr.Value)
+	if ok, pos := c.hasInvalidSymbol(expr.Value); ok {
+		newText := c.fixInvalid(expr.Value)
 		pass.Report(analysis.Diagnostic{
 			Pos:     expr.ValuePos + token.Pos(pos) + 1,
 			End:     expr.End(),
@@ -105,19 +113,19 @@ func (c *Checker) checkInvalid(pass *analysis.Pass, expr *ast.BasicLit) {
 	}
 }
 
-func (c *Checker) checkSensetive(pass *analysis.Pass, expr *ast.BasicLit) {
-	if ok, pos := hasSensetiveData(expr.Value); ok {
+func (c Checker) checkSensetive(pass *analysis.Pass, expr *ast.BasicLit) {
+	if ok, pos := c.hasSensetiveData(expr.Value); ok {
 		pass.Reportf(expr.ValuePos+token.Pos(pos), "sensetive data")
 	}
 }
 
-func (c *Checker) checkVariable(pass *analysis.Pass, expr *ast.Ident) {
-	if ok, _ := hasSensetiveData(expr.Name); ok {
+func (c Checker) checkVariable(pass *analysis.Pass, expr *ast.Ident) {
+	if ok, _ := c.hasSensetiveData(expr.Name); ok {
 		pass.Reportf(expr.NamePos, "sensetive data {%s}", expr.Name)
 	}
 }
 
-func (c *Checker) checkExpression(pass *analysis.Pass, arg ast.Expr) {
+func (c Checker) checkExpression(pass *analysis.Pass, arg ast.Expr) {
 	switch expr := arg.(type) {
 	case *ast.StarExpr:
 		c.checkExpression(pass, expr.X)
@@ -141,14 +149,20 @@ func (c *Checker) checkExpression(pass *analysis.Pass, arg ast.Expr) {
 		c.checkVariable(pass, expr)
 	case *ast.BasicLit:
 		if expr.Pos()-c.basePos == 0 {
-			c.checkCapital(pass, expr)
+			if c.cfg.CheckCapital {
+				c.checkCapital(pass, expr)
+			}
 		}
-		c.checkInvalid(pass, expr)
-		c.checkSensetive(pass, expr)
+		if c.cfg.CheckInvalid {
+			c.checkInvalid(pass, expr)
+		}
+		if c.cfg.CheckSensitive {
+			c.checkSensetive(pass, expr)
+		}
 	}
 }
 
-func isLoggerFunc(name string) bool {
+func (c Checker) isLoggerFunc(name string) bool {
 	loggerFuncNames := []string{
 		"warn", "info", "panic", "error", "log", "debug",
 	}
@@ -163,24 +177,24 @@ func isLoggerFunc(name string) bool {
 	return flag
 }
 
-func hasFirstCapital(text string) bool {
+func (c Checker) hasFirstCapital(text string) bool {
 	if len(text) == 0 {
 		return false
 	}
 	return 'A' <= text[0] && text[0] <= 'Z'
 }
 
-func hasInvalidSymbol(text string) (bool, int) {
+func (c Checker) hasInvalidSymbol(text string) (bool, int) {
 	clearText := strings.Trim(text, "\"")
 	for i, r := range clearText {
-		if !isSymbolValid(r) {
+		if !c.isSymbolValid(r) {
 			return true, i
 		}
 	}
 	return false, 0
 }
 
-func hasSensetiveData(text string) (bool, int) {
+func (c Checker) hasSensetiveData(text string) (bool, int) {
 	sensetive := []string{"password", "token", "login", "email", "id", "api", "credential"}
 	lowerText := strings.ToLower(text)
 	for _, word := range sensetive {
@@ -191,29 +205,29 @@ func hasSensetiveData(text string) (bool, int) {
 	return false, 0
 }
 
-func isSymbolValid(r rune) bool {
-	return unicode.In(r, unicode.Latin) || unicode.IsDigit(r) || r == rune(' ')
+func (c Checker) isSymbolValid(r rune) bool {
+	return unicode.In(r, unicode.Latin) || unicode.IsDigit(r) || r == rune(' ') || strings.ContainsRune(c.cfg.AllowedSymbols, r)
 }
 
-func fixCapital(text string) string {
+func (c Checker) fixCapital(text string) string {
 	if len(text) == 0 {
 		return ""
 	}
 	return strings.ToLower(text[:1]) + text[1:]
 }
 
-func fixInvalid(text string) string {
+func (c Checker) fixInvalid(text string) string {
 	var newText strings.Builder
 	newText.Grow(len(text))
 
 	for i, r := range text {
-		if r == rune('_') || r == rune('-') {
+		if strings.ContainsRune(c.cfg.ReplaceWithSpace, r) {
 			if i != 0 && i != len(text)-1 {
 				newText.WriteRune(' ')
 			}
 			continue
 		}
-		if !isSymbolValid(r) {
+		if !c.isSymbolValid(r) {
 			continue
 		}
 		newText.WriteRune(r)

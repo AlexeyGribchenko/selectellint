@@ -4,6 +4,13 @@ import (
 	"testing"
 )
 
+var testChecker = func() Checker {
+	c := Checker{}
+	cfg := DefaultConfig()
+	c.cfg = &cfg
+	return c
+}()
+
 func TestIsLoggerFunc(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -21,7 +28,7 @@ func TestIsLoggerFunc(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isLoggerFunc(tt.input)
+			result := testChecker.isLoggerFunc(tt.input)
 			if result != tt.expected {
 				t.Errorf("isLoggerFunc(%s): expected {%v}, got {%v}", tt.input, tt.expected, result)
 			}
@@ -44,7 +51,7 @@ func TestHasFirstCapital(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := hasFirstCapital(tt.input)
+			result := testChecker.hasFirstCapital(tt.input)
 			if result != tt.expected {
 				t.Errorf("hasFirstCapital(%s): expected {%v}, got {%v}", tt.input, tt.expected, result)
 			}
@@ -69,7 +76,7 @@ func TestHasInvalidSymbol(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resBool, resPos := hasInvalidSymbol(tt.input)
+			resBool, resPos := testChecker.hasInvalidSymbol(tt.input)
 			if resBool != tt.expectedBool || resPos != tt.expectedPos {
 				t.Errorf("hasInvalidSymbol(%s): expected {%v, %d}, got {%v, %d}",
 					tt.input, tt.expectedBool, tt.expectedPos, resBool, resPos,
@@ -95,7 +102,7 @@ func TestHasSensetiveData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resBool, resPos := hasSensetiveData(tt.input)
+			resBool, resPos := testChecker.hasSensetiveData(tt.input)
 			if resBool != tt.expectedBool || resPos != tt.expectedPos {
 				t.Errorf("hasInvalidSymbol(%s): expected {%v, %d}, got {%v, %d}",
 					tt.input, tt.expectedBool, tt.expectedPos, resBool, resPos,
@@ -122,7 +129,7 @@ func TestFixCapital(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := fixCapital(tt.input)
+			res := testChecker.fixCapital(tt.input)
 			if res != tt.expected {
 				t.Errorf("fixInvalid(%s): expected {%s}, got {%s}",
 					tt.input, tt.expected, res,
@@ -147,7 +154,7 @@ func TestFixInvalidSymbols(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := fixInvalid(tt.input)
+			res := testChecker.fixInvalid(tt.input)
 			if res != tt.expected {
 				t.Errorf("fixInvalid(%s): expected {%s}, got {%s}",
 					tt.input, tt.expected, res,
@@ -184,7 +191,7 @@ func TestIsSymbolValid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isSymbolValid(tt.input)
+			result := testChecker.isSymbolValid(tt.input)
 			if result != tt.expected {
 				t.Errorf("isSymbolValid(%q) = %v, want %v",
 					tt.input, result, tt.expected)
