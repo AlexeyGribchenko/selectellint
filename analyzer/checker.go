@@ -195,7 +195,7 @@ func (c Checker) hasInvalidSymbol(text string) (bool, int) {
 }
 
 func (c Checker) hasSensetiveData(text string) (bool, int) {
-	sensetive := []string{"password", "token", "login", "email", "id", "api", "credential"}
+	sensetive := c.cfg.SensitiveWords
 	lowerText := strings.ToLower(text)
 	for _, word := range sensetive {
 		if strings.Contains(lowerText, word) {

@@ -18,5 +18,6 @@ func DefaultConfig() Config {
 		CheckSensitive:   true,
 		AllowedSymbols:   "",
 		ReplaceWithSpace: "_-",
+		SensitiveWords:   []string{"password", "token", "login", "email", "id", "api", "credential"},
 	}
 }
