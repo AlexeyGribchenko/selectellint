@@ -44,7 +44,6 @@ func run(pass *analysis.Pass) (any, error) {
 			return true
 		})
 	}
-
 	return nil, nil
 }
 
@@ -53,8 +52,12 @@ type Checker struct {
 }
 
 func (c *Checker) checkCapital(pass *analysis.Pass, expr *ast.BasicLit) {
+	if expr.Kind != token.STRING {
+		return
+	}
+
 	clearText := strings.Trim(expr.Value, "\"")
-	if expr.Kind == token.STRING && hasFirstCapital(clearText) {
+	if len(clearText) > 0 && hasFirstCapital(clearText) {
 		newText := fixCapital(clearText)
 		pass.Report(analysis.Diagnostic{
 			Pos:     expr.ValuePos + 1,
@@ -62,6 +65,7 @@ func (c *Checker) checkCapital(pass *analysis.Pass, expr *ast.BasicLit) {
 			Message: "message should start with lowercase",
 			SuggestedFixes: []analysis.SuggestedFix{
 				{
+					Message: "convert first letter to lowercase",
 					TextEdits: []analysis.TextEdit{
 						{
 							Pos:     expr.ValuePos + 1,
@@ -76,7 +80,11 @@ func (c *Checker) checkCapital(pass *analysis.Pass, expr *ast.BasicLit) {
 }
 
 func (c *Checker) checkInvalid(pass *analysis.Pass, expr *ast.BasicLit) {
-	if ok, pos := hasInvalidSymbol(expr.Value); expr.Kind == token.STRING && ok {
+	if expr.Kind != token.STRING {
+		return
+	}
+
+	if ok, pos := hasInvalidSymbol(expr.Value); ok {
 		newText := fixInvalid(expr.Value)
 		pass.Report(analysis.Diagnostic{
 			Pos:     expr.ValuePos + token.Pos(pos) + 1,
@@ -188,15 +196,27 @@ func isSymbolValid(r rune) bool {
 }
 
 func fixCapital(text string) string {
+	if len(text) == 0 {
+		return ""
+	}
 	return strings.ToLower(text[:1]) + text[1:]
 }
 
 func fixInvalid(text string) string {
-	newText := make([]rune, len(text))
-	for _, r := range text {
-		if isSymbolValid(r) {
-			newText = append(newText, r)
+	var newText strings.Builder
+	newText.Grow(len(text))
+
+	for i, r := range text {
+		if r == rune('_') || r == rune('-') {
+			if i != 0 && i != len(text)-1 {
+				newText.WriteRune(' ')
+			}
+			continue
 		}
+		if !isSymbolValid(r) {
+			continue
+		}
+		newText.WriteRune(r)
 	}
-	return string(newText)
+	return newText.String()
 }

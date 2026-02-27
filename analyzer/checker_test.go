@@ -104,3 +104,91 @@ func TestHasSensetiveData(t *testing.T) {
 		})
 	}
 }
+
+func TestFixCapital(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"valid text", "server started", "server started"},
+		{"valid text", "sERVER STARTED", "sERVER STARTED"},
+		{"invalid text", "Server started", "server started"},
+		{"invalid text", "SeRVer started", "seRVer started"},
+		{"empty string", "", ""},
+		{"one symbol 1", "S", "s"},
+		{"one symbol 2", "s", "s"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := fixCapital(tt.input)
+			if res != tt.expected {
+				t.Errorf("fixInvalid(%s): expected {%s}, got {%s}",
+					tt.input, tt.expected, res,
+				)
+			}
+		})
+	}
+}
+
+func TestFixInvalidSymbols(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"valid text", "request id is", "request id is"},
+		{"invalid text: wrong symbol", "te*&st!.", "test"},
+		{"invalid text: wrong symbol", "te🔥st🔥", "test"},
+		{"invalid text: underline", "_test_name_", "test name"},
+		{"invalid text: dash", "-test-name-", "test name"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := fixInvalid(tt.input)
+			if res != tt.expected {
+				t.Errorf("fixInvalid(%s): expected {%s}, got {%s}",
+					tt.input, tt.expected, res,
+				)
+			}
+		})
+	}
+}
+
+func TestIsSymbolValid(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    rune
+		expected bool
+	}{
+		{"latin lowercase", 'f', true},
+		{"latin uppercase", 'S', true},
+		{"digit", '7', true},
+		{"space", ' ', true},
+
+		{"underscore", '_', false},
+		{"hyphen", '-', false},
+		{"dot", '.', false},
+		{"at sign", '@', false},
+		{"hash", '#', false},
+
+		{"cyrillic lowercase", 'а', false},
+		{"cyrillic uppercase", 'Б', false},
+		{"japanese character", 'あ', false},
+
+		{"tab", '\t', false},
+		{"newline", '\n', false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isSymbolValid(tt.input)
+			if result != tt.expected {
+				t.Errorf("isSymbolValid(%q) = %v, want %v",
+					tt.input, result, tt.expected)
+			}
+		})
+	}
+}
