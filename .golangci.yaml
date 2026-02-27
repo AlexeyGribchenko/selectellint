@@ -1,0 +1,17 @@
+version: "2"
+
+linters:
+  settings:
+    custom:
+      selectellint:
+        path: /usr/local/lib/selectellint.so
+        description: Linter for logging massages
+        original-url: github.com/AlexeyGribchenko/selectellint
+        settings:
+          check-capital: true
+          check-invalid: true
+          check-sensitive: true
+          allowed-symbols: ""
+          replace-with-space: "-_"
+  enable:
+    - selectellint
